@@ -1,0 +1,9 @@
+go 1.22
+
+use (
+	./ojs-gin
+	./ojs-echo
+	./ojs-fiber
+	./ojs-gorm
+	./ojs-serverless
+)
