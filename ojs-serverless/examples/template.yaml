@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: OJS Serverless Worker — AWS Lambda + SQS integration for Open Job Spec
+
+Parameters:
+  OJSServerURL:
+    Type: String
+    Description: URL of the OJS backend server
+    Default: http://localhost:8080
+  QueueName:
+    Type: String
+    Description: Name of the SQS queue to consume from
+    Default: ojs-default
+  BatchSize:
+    Type: Number
+    Description: Maximum number of messages per Lambda invocation
+    Default: 10
+    MinValue: 1
+    MaxValue: 10
+  MaxBatchingWindowSeconds:
+    Type: Number
+    Description: Maximum time to wait for a full batch
+    Default: 5
+    MinValue: 0
+    MaxValue: 300
+  FunctionMemorySize:
+    Type: Number
+    Description: Lambda function memory in MB
+    Default: 256
+    MinValue: 128
+    MaxValue: 10240
+  FunctionTimeout:
+    Type: Number
+    Description: Lambda function timeout in seconds
+    Default: 30
+    MinValue: 1
+    MaxValue: 900
+
+Resources:
+  # SQS Queue for OJS jobs
+  OJSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref QueueName
+      VisibilityTimeout: !Ref FunctionTimeout
+      MessageRetentionPeriod: 1209600  # 14 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt OJSDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  # Dead letter queue for failed jobs
+  OJSDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${QueueName}-dlq'
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  # Lambda function that processes OJS jobs
+  OJSWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      MemorySize: !Ref FunctionMemorySize
+      Timeout: !Ref FunctionTimeout
+      Environment:
+        Variables:
+          OJS_URL: !Ref OJSServerURL
+      Events:
+        OJSQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt OJSQueue.Arn
+            BatchSize: !Ref BatchSize
+            MaximumBatchingWindowInSeconds: !Ref MaxBatchingWindowSeconds
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !Ref QueueName
+
+Outputs:
+  FunctionArn:
+    Description: ARN of the OJS worker Lambda function
+    Value: !GetAtt OJSWorkerFunction.Arn
+  QueueUrl:
+    Description: URL of the SQS queue
+    Value: !Ref OJSQueue
+  QueueArn:
+    Description: ARN of the SQS queue
+    Value: !GetAtt OJSQueue.Arn
+  DeadLetterQueueUrl:
+    Description: URL of the dead letter queue
+    Value: !Ref OJSDeadLetterQueue
