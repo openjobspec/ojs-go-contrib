@@ -11,6 +11,7 @@ services:
       - REDIS_URL=redis://redis:6379
     depends_on:
       - redis
+  # ⚠️  DEVELOPMENT ONLY — Do not use these credentials in production.
   postgres:
     image: postgres:15-alpine
     ports:
