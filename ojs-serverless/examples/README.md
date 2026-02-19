@@ -28,3 +28,4 @@ The SAM template (`template.yaml`) provisions:
 - A dead-letter queue for failed jobs
 - A Lambda function triggered by SQS events
 - Partial batch failure reporting for efficient retries
+
