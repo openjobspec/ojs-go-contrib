@@ -1,3 +1,4 @@
+// v0.9.0 — Release Candidate
 module github.com/openjobspec/ojs-go-contrib/ojs-gin
 
 go 1.22

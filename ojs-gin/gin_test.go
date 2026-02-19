@@ -1,6 +1,8 @@
 package ojsgin
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,4 +68,198 @@ func TestEnqueue_NoClient(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	r.ServeHTTP(w, req)
+}
+
+func TestEnqueue_NoClient_ErrorMessage(t *testing.T) {
+	r := gin.New()
+	r.POST("/", func(c *gin.Context) {
+		err := Enqueue(c, "test.job", ojs.Args{"key": "arg1"})
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		want := "ojsgin: no OJS client in context; use ojsgin.Middleware"
+		if err.Error() != want {
+			t.Errorf("expected %q, got %q", want, err.Error())
+		}
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	r.ServeHTTP(w, req)
+}
+
+func TestMiddleware_MultipleRequests_SameClient(t *testing.T) {
+	client, _ := ojs.NewClient("http://localhost:8080")
+
+	r := gin.New()
+	r.Use(Middleware(client))
+
+	var clients []*ojs.Client
+	r.GET("/", func(c *gin.Context) {
+		got, ok := ClientFromContext(c)
+		if !ok {
+			t.Fatal("expected client in context")
+		}
+		clients = append(clients, got)
+		c.Status(http.StatusOK)
+	})
+
+	for i := 0; i < 3; i++ {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.ServeHTTP(w, req)
+	}
+
+	if len(clients) != 3 {
+		t.Fatalf("expected 3 clients, got %d", len(clients))
+	}
+	for i, c := range clients {
+		if c != client {
+			t.Errorf("request %d: expected same client instance", i)
+		}
+	}
+}
+
+func TestMiddleware_ChainedMiddleware(t *testing.T) {
+	client, _ := ojs.NewClient("http://localhost:8080")
+	order := make([]string, 0, 3)
+
+	r := gin.New()
+
+	r.Use(func(c *gin.Context) {
+		order = append(order, "before")
+		c.Next()
+	})
+
+	r.Use(Middleware(client))
+
+	r.Use(func(c *gin.Context) {
+		order = append(order, "after")
+		c.Next()
+	})
+
+	r.GET("/", func(c *gin.Context) {
+		order = append(order, "handler")
+		_, ok := ClientFromContext(c)
+		if !ok {
+			t.Fatal("expected client in context after middleware chain")
+		}
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.ServeHTTP(w, req)
+
+	if len(order) != 3 {
+		t.Fatalf("expected 3 middleware calls, got %d: %v", len(order), order)
+	}
+	if order[0] != "before" || order[1] != "after" || order[2] != "handler" {
+		t.Errorf("unexpected middleware order: %v", order)
+	}
+}
+
+func TestMiddleware_CustomErrorHandler(t *testing.T) {
+	client, _ := ojs.NewClient("http://localhost:8080")
+
+	r := gin.New()
+	r.Use(Middleware(client))
+	r.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": c.Errors.Last().Error(),
+			})
+		}
+	})
+
+	r.GET("/", func(c *gin.Context) {
+		_ = c.Error(fmt.Errorf("custom error"))
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestNewWorkerManager_Defaults(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{URL: "http://localhost:8080"})
+	if len(wm.options.Queues) != 1 || wm.options.Queues[0] != "default" {
+		t.Errorf("expected default queue, got %v", wm.options.Queues)
+	}
+	if wm.options.Concurrency != 10 {
+		t.Errorf("expected concurrency 10, got %d", wm.options.Concurrency)
+	}
+}
+
+func TestNewWorkerManager_CustomOptions(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{
+		URL:         "http://localhost:9090",
+		Queues:      []string{"email", "reports"},
+		Concurrency: 20,
+	})
+	if len(wm.options.Queues) != 2 {
+		t.Errorf("expected 2 queues, got %d", len(wm.options.Queues))
+	}
+	if wm.options.Concurrency != 20 {
+		t.Errorf("expected concurrency 20, got %d", wm.options.Concurrency)
+	}
+}
+
+func TestStart_NoHandlers(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{URL: "http://localhost:8080"})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := wm.Start(ctx)
+	if err == nil {
+		t.Fatal("expected error when starting without handlers")
+	}
+}
+
+func TestStop_NoWorker(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{URL: "http://localhost:8080"})
+	err := wm.Stop()
+	if err != nil {
+		t.Fatalf("expected no error stopping unstarted worker, got %v", err)
+	}
+}
+
+func TestHealthHandler_NoWorker(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{URL: "http://localhost:8080"})
+
+	r := gin.New()
+	r.GET("/health", wm.HealthHandler())
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+func TestNewWorkerManager_ZeroConcurrency(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{
+		URL:         "http://localhost:8080",
+		Concurrency: 0,
+	})
+	if wm.options.Concurrency != 10 {
+		t.Errorf("expected default concurrency 10 for zero value, got %d", wm.options.Concurrency)
+	}
+}
+
+func TestNewWorkerManager_NegativeConcurrency(t *testing.T) {
+	wm := NewWorkerManager(WorkerOptions{
+		URL:         "http://localhost:8080",
+		Concurrency: -5,
+	})
+	if wm.options.Concurrency != 10 {
+		t.Errorf("expected default concurrency 10 for negative value, got %d", wm.options.Concurrency)
+	}
 }
