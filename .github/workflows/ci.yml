@@ -13,6 +13,7 @@ jobs:
       matrix:
         go-version: ['1.22', '1.23']
         package:
+          - ojs-chi
           - ojs-gin
           - ojs-echo
           - ojs-fiber

@@ -1,6 +1,7 @@
 go 1.22
 
 use (
+	./ojs-chi
 	./ojs-gin
 	./ojs-echo
 	./ojs-fiber

@@ -9,6 +9,7 @@ Community framework integrations for the [OJS Go SDK](https://github.com/openjob
 
 | Status | Integration | Description |
 |--------|-------------|-------------|
+| alpha  | [Chi](./ojs-chi/README.md) | Chi router middleware — the same router used by OJS backends |
 | alpha  | [Gin](./ojs-gin/README.md) | Gin web framework middleware and request-scoped OJS client |
 | alpha  | [Echo](./ojs-echo/README.md) | Echo web framework middleware and context integration |
 | alpha  | [Fiber](./ojs-fiber/README.md) | Fiber web framework middleware and Locals-based client access |

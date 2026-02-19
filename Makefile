@@ -1,6 +1,6 @@
 .PHONY: test lint test-all
 
-PACKAGES = ojs-gin ojs-echo ojs-fiber ojs-gorm ojs-serverless
+PACKAGES = ojs-chi ojs-gin ojs-echo ojs-fiber ojs-gorm ojs-serverless
 
 test:
 	@for pkg in $(PACKAGES); do \
