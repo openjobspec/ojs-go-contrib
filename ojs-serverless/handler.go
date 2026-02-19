@@ -87,12 +87,15 @@ func WithLogger(logger *slog.Logger) Option {
 	}
 }
 
-// LambdaHandler processes OJS jobs delivered via SQS or HTTP push.
+// LambdaHandler processes OJS jobs delivered via SQS, HTTP push,
+// API Gateway, or EventBridge events.
 type LambdaHandler struct {
-	handlers map[string]HandlerFunc
-	mu       sync.RWMutex
-	ojsURL   string
-	logger   *slog.Logger
+	handlers       map[string]HandlerFunc
+	defaultHandler HandlerFunc
+	mu             sync.RWMutex
+	ojsURL         string
+	logger         *slog.Logger
+	warmupFn       func()
 }
 
 // NewLambdaHandler creates a new serverless handler with the given options.
@@ -199,6 +202,9 @@ func (h *LambdaHandler) processJob(ctx context.Context, job JobEvent) error {
 	h.mu.RUnlock()
 
 	if !ok {
+		if h.defaultHandler != nil {
+			return h.defaultHandler(ctx, job)
+		}
 		return fmt.Errorf("no handler registered for job type: %s", job.Type)
 	}
 
