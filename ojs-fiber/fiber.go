@@ -45,3 +45,4 @@ func Enqueue(c *fiber.Ctx, jobType string, args ojs.Args, opts ...ojs.EnqueueOpt
 	_, err := client.Enqueue(c.UserContext(), jobType, args, opts...)
 	return err
 }
+
