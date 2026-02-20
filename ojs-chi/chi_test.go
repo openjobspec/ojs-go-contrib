@@ -209,3 +209,4 @@ func TestStop_NoWorker(t *testing.T) {
 		t.Fatalf("expected no error stopping unstarted worker, got %v", err)
 	}
 }
+
