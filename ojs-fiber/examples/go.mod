@@ -9,3 +9,4 @@ require (
 )
 
 replace github.com/openjobspec/ojs-go-contrib/ojs-fiber => ../
+
