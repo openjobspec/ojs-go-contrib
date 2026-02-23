@@ -1,6 +1,6 @@
 module github.com/openjobspec/ojs-go-contrib/ojs-gorm/examples
 
-go 1.22
+go 1.24
 
 require (
 	gorm.io/driver/postgres v1.5.0
