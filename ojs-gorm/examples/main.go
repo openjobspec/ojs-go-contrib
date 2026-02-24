@@ -16,6 +16,7 @@ type User struct {
 }
 
 func main() {
+	// Development only — use environment variables or a secrets manager in production.
 	dsn := "host=localhost user=ojs password=ojs dbname=ojs_example port=5432 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
