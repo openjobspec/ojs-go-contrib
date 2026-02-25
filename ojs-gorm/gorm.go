@@ -113,3 +113,4 @@ func EnqueueAfterCommitJSON(tx *gorm.DB, jobType string, args json.RawMessage, o
 	}
 	EnqueueAfterCommit(tx, jobType, decoded, opts...)
 }
+
