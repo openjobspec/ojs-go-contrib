@@ -156,3 +156,4 @@ type WorkerOptions struct {
 | Echo | v4.12.0+ |
 | Fiber | v2.52.0+ |
 | GORM | v1.25.0+ |
+
