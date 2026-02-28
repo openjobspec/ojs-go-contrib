@@ -5,5 +5,5 @@ go 1.24
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.0
-	github.com/openjobspec/ojs-go-sdk v0.1.0
+	github.com/openjobspec/ojs-go-sdk v0.2.0
 )

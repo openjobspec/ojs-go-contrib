@@ -5,5 +5,5 @@ go 1.24
 
 require (
 	gorm.io/gorm v1.25.0
-	github.com/openjobspec/ojs-go-sdk v0.1.0
+	github.com/openjobspec/ojs-go-sdk v0.2.0
 )
