@@ -40,3 +40,4 @@ curl http://localhost:3000/health
 - `main.go` — Chi router with OJS middleware, job enqueue routes, and embedded worker
 - `worker.go` — Standalone worker example (shared process with server)
 - `docker-compose.yml` — Redis + OJS backend server
+
