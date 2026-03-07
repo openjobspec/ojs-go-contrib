@@ -179,4 +179,3 @@ func WithPublishPriority(priority int) publishOption {
 		e.Priority = priority
 	}
 }
-
