@@ -52,3 +52,4 @@ We believe in recognizing the efforts of security researchers. With your permiss
 ## Security Best Practices for Implementers
 
 If you are implementing an OJS-compliant backend or SDK, please review the security considerations in the [Core Specification](https://github.com/openjobspec/spec/blob/main/spec/ojs-core.md) and ensure your implementation follows the recommended practices for authentication, authorization, and input validation.
+
