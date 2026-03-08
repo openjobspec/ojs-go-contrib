@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	ojs "github.com/openjobspec/ojs-go-sdk"	"gorm.io/gorm"
+	ojs "github.com/openjobspec/ojs-go-sdk"
+	"gorm.io/gorm"
 )
 
 // OutboxEntry represents a pending job in the outbox table.

@@ -49,16 +49,18 @@ func NewWorkerManager(opts WorkerOptions) *WorkerManager {
 // Must be called before Start.
 func (wm *WorkerManager) Register(jobType string, handler JobHandlerFunc) {
 	if wm.worker == nil {
-		wm.worker = ojs.NewWorker(ojs.WorkerConfig{
-			URL:          wm.options.URL,
-			Queues:       wm.options.Queues,
-			Concurrency:  wm.options.Concurrency,
-			PollInterval: wm.options.PollInterval,
-		})
+		var opts []ojs.WorkerOption
+		if len(wm.options.Queues) > 0 {
+			opts = append(opts, ojs.WithQueues(wm.options.Queues...))
+		}
+		if wm.options.Concurrency > 0 {
+			opts = append(opts, ojs.WithConcurrency(wm.options.Concurrency))
+		}
+		wm.worker = ojs.NewWorker(wm.options.URL, opts...)
 	}
-	wm.worker.Register(jobType, ojs.HandlerFunc(func(ctx *ojs.JobContext) error {
-		return handler(ctx.Context(), ctx)
-	}))
+	wm.worker.Register(jobType, func(ctx ojs.JobContext) error {
+		return handler(ctx.Context(), &ctx)
+	})
 }
 
 // Start begins processing jobs. This is a blocking call.
@@ -82,11 +84,9 @@ func (wm *WorkerManager) StartAsync(ctx context.Context) error {
 }
 
 // Stop gracefully shuts down the worker.
+// Deprecated: Use context cancellation with Start() instead.
 func (wm *WorkerManager) Stop() error {
-	if wm.worker == nil {
-		return nil
-	}
-	return wm.worker.Stop()
+	return nil
 }
 
 // HealthHandler returns a Gin handler that reports worker health.
