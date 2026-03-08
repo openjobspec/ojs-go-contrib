@@ -56,3 +56,4 @@ Returns an HTTP handler for OJS push delivery.
 ## Example
 
 See [examples/](./examples/) for a complete SAM template and Lambda handler example.
+
