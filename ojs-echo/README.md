@@ -54,3 +54,4 @@ Retrieves the OJS client stored in the Echo context by the middleware.
 ## Example
 
 See [examples/](./examples/) for a complete working demo with Docker Compose.
+
