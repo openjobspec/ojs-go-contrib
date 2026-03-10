@@ -35,4 +35,3 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on adding new contrib pa
 ## License
 
 Apache 2.0 — see [LICENSE](./LICENSE).
-
