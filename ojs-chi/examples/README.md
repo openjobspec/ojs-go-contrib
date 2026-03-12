@@ -4,7 +4,7 @@ A complete example using Chi router with OJS middleware and worker.
 
 ## Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - Docker and Docker Compose
 
 ## Running

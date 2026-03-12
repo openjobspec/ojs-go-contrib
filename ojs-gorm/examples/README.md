@@ -5,7 +5,7 @@ A complete application demonstrating transactional job enqueue with GORM and OJS
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- Go 1.22+
+- Go 1.24+
 
 ## Setup
 

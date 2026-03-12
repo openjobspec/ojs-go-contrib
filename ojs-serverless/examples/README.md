@@ -5,7 +5,7 @@ An AWS Lambda handler example for processing OJS jobs via SQS.
 ## Prerequisites
 
 - [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
-- Go 1.22+
+- Go 1.24+
 - Docker (for local testing)
 
 ## Deploy

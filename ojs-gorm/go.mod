@@ -1,7 +1,7 @@
 // v0.9.0 — Release Candidate
 module github.com/openjobspec/ojs-go-contrib/ojs-gorm
 
-go 1.24
+go 1.24.0
 
 require (
 	gorm.io/gorm v1.25.0

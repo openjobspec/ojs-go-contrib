@@ -1,7 +1,7 @@
 // v0.9.0 — Release Candidate
 module github.com/openjobspec/ojs-go-contrib/ojs-gin
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/gin-gonic/gin v1.10.0
