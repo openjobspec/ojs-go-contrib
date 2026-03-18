@@ -2,6 +2,7 @@ package ojsgin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -261,5 +262,196 @@ func TestNewWorkerManager_NegativeConcurrency(t *testing.T) {
 	})
 	if wm.options.Concurrency != 10 {
 		t.Errorf("expected default concurrency 10 for negative value, got %d", wm.options.Concurrency)
+	}
+}
+
+// --- MustClientFromContext tests ---
+
+func TestMustClientFromContext_Panics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic when no client in context")
+		}
+	}()
+
+	r := gin.New()
+	r.GET("/", func(c *gin.Context) {
+		MustClientFromContext(c)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.ServeHTTP(w, req)
+}
+
+func TestMustClientFromContext_Success(t *testing.T) {
+	client, _ := ojs.NewClient("http://localhost:8080")
+
+	r := gin.New()
+	r.Use(Middleware(client))
+	r.GET("/", func(c *gin.Context) {
+		got := MustClientFromContext(c)
+		if got != client {
+			t.Fatal("expected same client instance")
+		}
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+// --- Health Check Handler tests ---
+
+func TestHealthCheckHandler_Healthy(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":         "healthy",
+			"version":        "1.0.0",
+			"uptime_seconds": 42,
+		})
+	}))
+	defer fake.Close()
+
+	client, err := ojs.NewClient(fake.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := gin.New()
+	r.GET("/healthz", HealthCheckHandler(client))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestHealthCheckHandler_Unreachable(t *testing.T) {
+	client, err := ojs.NewClient("http://127.0.0.1:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := gin.New()
+	r.GET("/healthz", HealthCheckHandler(client))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+func TestHealthCheckHandler_Unhealthy(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status": "degraded",
+		})
+	}))
+	defer fake.Close()
+
+	client, err := ojs.NewClient(fake.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := gin.New()
+	r.GET("/healthz", HealthCheckHandler(client))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+// --- Cron helper tests ---
+
+func TestCronConfig_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  CronConfig
+		wantErr bool
+	}{
+		{
+			name:    "empty name",
+			config:  CronConfig{Schedule: "* * * * *", JobType: "test"},
+			wantErr: true,
+		},
+		{
+			name:    "empty schedule",
+			config:  CronConfig{Name: "test", JobType: "test"},
+			wantErr: true,
+		},
+		{
+			name:    "empty job type",
+			config:  CronConfig{Name: "test", Schedule: "* * * * *"},
+			wantErr: true,
+		},
+	}
+
+	client, _ := ojs.NewClient("http://127.0.0.1:1")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RegisterCrons(context.Background(), client, []CronConfig{tt.config})
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RegisterCrons() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCronConfig_ValidConfig(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"name":     "test-cron",
+			"cron":     "*/5 * * * *",
+			"type":     "email.digest",
+			"timezone": "UTC",
+		})
+	}))
+	defer fake.Close()
+
+	client, err := ojs.NewClient(fake.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crons := []CronConfig{
+		{
+			Name:     "test-cron",
+			Schedule: "*/5 * * * *",
+			JobType:  "email.digest",
+			Args:     ojs.Args{"key": "value"},
+		},
+	}
+
+	err = RegisterCrons(context.Background(), client, crons)
+	if err != nil {
+		t.Errorf("RegisterCrons() unexpected error: %v", err)
+	}
+}
+
+func TestCronConfig_EmptySlice(t *testing.T) {
+	client, _ := ojs.NewClient("http://127.0.0.1:1")
+	err := RegisterCrons(context.Background(), client, nil)
+	if err != nil {
+		t.Errorf("RegisterCrons(nil) unexpected error: %v", err)
 	}
 }

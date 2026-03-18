@@ -47,3 +47,14 @@ func Enqueue(c echo.Context, jobType string, args ojs.Args, opts ...ojs.EnqueueO
 	_, err := client.Enqueue(c.Request().Context(), jobType, args, opts...)
 	return err
 }
+
+// MustClientFromContext retrieves the OJS client from the Echo context and
+// panics if it is not found. Use this only when the middleware is guaranteed
+// to be registered upstream.
+func MustClientFromContext(c echo.Context) *ojs.Client {
+	client, ok := ClientFromContext(c)
+	if !ok {
+		panic("ojsecho: no OJS client in context; use ojsecho.Middleware")
+	}
+	return client
+}

@@ -46,3 +46,14 @@ func Enqueue(c *fiber.Ctx, jobType string, args ojs.Args, opts ...ojs.EnqueueOpt
 	return err
 }
 
+// MustClientFromContext retrieves the OJS client from Fiber's Locals and
+// panics if it is not found. Use this only when the middleware is guaranteed
+// to be registered upstream.
+func MustClientFromContext(c *fiber.Ctx) *ojs.Client {
+	client, ok := ClientFromContext(c)
+	if !ok {
+		panic("ojsfiber: no OJS client in context; use ojsfiber.Middleware")
+	}
+	return client
+}
+

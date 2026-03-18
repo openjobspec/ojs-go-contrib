@@ -45,3 +45,14 @@ func Enqueue(c *gin.Context, jobType string, args ojs.Args, opts ...ojs.EnqueueO
 	_, err := client.Enqueue(c.Request.Context(), jobType, args, opts...)
 	return err
 }
+
+// MustClientFromContext retrieves the OJS client from the Gin context and
+// panics if it is not found. Use this only when the middleware is guaranteed
+// to be registered upstream.
+func MustClientFromContext(c *gin.Context) *ojs.Client {
+	client, ok := ClientFromContext(c)
+	if !ok {
+		panic("ojsgin: no OJS client in context; use ojsgin.Middleware")
+	}
+	return client
+}
