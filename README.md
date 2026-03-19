@@ -1,4 +1,5 @@
 # Open Job Spec — Go Contrib
+[![Stability: beta](https://img.shields.io/badge/stability-beta-yellow.svg)](https://github.com/openjobspec/openjobspec/blob/main/STABILITY.md)
 
 [![CI](https://github.com/openjobspec/ojs-go-contrib/actions/workflows/ci.yml/badge.svg)](https://github.com/openjobspec/ojs-go-contrib/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/openjobspec/ojs-go-contrib.svg)](https://pkg.go.dev/github.com/openjobspec/ojs-go-contrib)
