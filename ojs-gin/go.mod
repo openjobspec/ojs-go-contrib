@@ -5,7 +5,7 @@ go 1.24.0
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/openjobspec/ojs-go-sdk v0.2.0
+	github.com/openjobspec/ojs-go-sdk v0.4.0
 )
 
 require (
