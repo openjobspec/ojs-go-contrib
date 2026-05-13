@@ -1,3 +1,4 @@
 github.com/go-chi/chi/v5 v5.2.5 h1:Eg4myHZBjyvJmAFjFvWgrqDTXFyOzjj7YIm3L3mu6Ug=
+github.com/go-chi/chi/v5 v5.2.5/go.mod h1:X7Gx4mteadT3eDOMTsXzmI4/rwUpOwBHLpAfupzFJP0=
 github.com/openjobspec/ojs-go-sdk v0.2.0 h1:QraId0NmZy/8/7pVFYGGCYouaoqvTbCR16bc/vU268k=
 github.com/openjobspec/ojs-go-sdk v0.2.0/go.mod h1:mftGvnHQgSUeO7he/oagaZHL7y8CDc1n69zJ8+FDeDQ=
