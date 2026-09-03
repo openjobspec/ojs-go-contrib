@@ -15,16 +15,23 @@ Start the OJS backend and PostgreSQL:
 docker compose up -d
 ```
 
+Set the PostgreSQL DSN (and optionally OJS authentication):
+
+```bash
+export DATABASE_URL='host=localhost user=ojs password=local-dev dbname=ojs_example port=5432 sslmode=disable'
+export OJS_AUTH_TOKEN='optional-token'
+```
+
 Run the application:
 
 ```bash
-go run main.go
+go run .
 ```
 
 In another terminal, run the worker:
 
 ```bash
-go run worker.go
+go run ./worker
 ```
 
 ## How It Works

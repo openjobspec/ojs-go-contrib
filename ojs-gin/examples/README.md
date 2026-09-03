@@ -18,13 +18,13 @@ docker compose up -d
 Run the API server:
 
 ```bash
-go run main.go
+go run .
 ```
 
 In another terminal, run the worker:
 
 ```bash
-go run worker.go
+go run ./worker
 ```
 
 ## Usage
