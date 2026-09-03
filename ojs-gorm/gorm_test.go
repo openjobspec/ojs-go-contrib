@@ -141,7 +141,7 @@ func TestTxState_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			state.mu.Lock()
 			state.jobs = append(state.jobs, pendingJob{
-				jobType: fmt.Sprintf("job.%d", idx),
+				jobType: fmt.Sprintf("job_%d", idx),
 				args:    ojs.Args{"idx": idx},
 			})
 			state.mu.Unlock()
@@ -188,12 +188,12 @@ func TestPlugin_NameConstant(t *testing.T) {
 
 func TestOutboxEntry_Fields(t *testing.T) {
 	entry := OutboxEntry{
-		ID:      1,
-		JobType: "email.send",
-		Args:    json.RawMessage(`{"to":"a@b.com"}`),
-		Queue:   "default",
+		ID:       1,
+		JobType:  "email.send",
+		Args:     json.RawMessage(`{"to":"a@b.com"}`),
+		Queue:    "default",
 		Priority: 5,
-		Status:  "pending",
+		Status:   "pending",
 	}
 
 	if entry.TableName() != "ojs_outbox" {
