@@ -150,10 +150,9 @@ type WorkerOptions struct {
 | Dependency | Minimum Version |
 |-----------|----------------|
 | Go | 1.22+ |
-| ojs-go-sdk | 0.1.0+ |
+| ojs-go-sdk | 0.5.0+ |
 | Chi | v5.1.0+ |
 | Gin | v1.10.0+ |
 | Echo | v4.12.0+ |
 | Fiber | v2.52.0+ |
 | GORM | v1.25.0+ |
-

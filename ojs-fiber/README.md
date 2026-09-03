@@ -5,7 +5,7 @@ Fiber web framework middleware for [Open Job Spec](https://github.com/openjobspe
 ## Installation
 
 ```bash
-go get github.com/openjobspec/ojs-go-contrib/ojs-fiber
+go get github.com/openjobspec/ojs-go-contrib/ojs-fiber@v0.5.0
 ```
 
 ## Usage
@@ -50,6 +50,10 @@ Helper that retrieves the OJS client from Fiber's Locals and enqueues a job.
 ### `ClientFromContext(c *fiber.Ctx) (*ojs.Client, bool)`
 
 Retrieves the OJS client stored in Fiber's Locals by the middleware.
+
+### Worker lifecycle
+
+`NewWorkerManager` applies queue, concurrency, poll interval, and shutdown grace settings. Use `NewWorkerManagerWithSDKOptions` for SDK options such as `ojs.WithWorkerAuth`, and observe `StartAsync` completion through `Wait` or `Err`. `HealthHandler` reports ready only while the worker is running.
 
 ## Example
 
