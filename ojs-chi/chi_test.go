@@ -361,5 +361,3 @@ func TestCronConfig_EmptySlice(t *testing.T) {
 		t.Errorf("RegisterCrons(nil) unexpected error: %v", err)
 	}
 }
-
-
