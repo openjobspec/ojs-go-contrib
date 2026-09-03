@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "version-file": "VERSION",
+      "include-component-in-tag": false,
+      "include-v-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "ojs-chi": {
+      "release-type": "go",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "skip-changelog": true
+    },
+    "ojs-echo": {
+      "release-type": "go",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "skip-changelog": true
+    },
+    "ojs-fiber": {
+      "release-type": "go",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "skip-changelog": true
+    },
+    "ojs-gin": {
+      "release-type": "go",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "skip-changelog": true
+    },
+    "ojs-gorm": {
+      "release-type": "go",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "skip-changelog": true
+    },
+    "ojs-serverless": {
+      "release-type": "go",
+      "include-component-in-tag": true,
+      "include-v-in-tag": true,
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "skip-changelog": true
+    }
+  }
+}

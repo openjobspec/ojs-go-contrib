@@ -1,0 +1,9 @@
+{
+  ".": "0.4.0",
+  "ojs-chi": "0.4.0",
+  "ojs-echo": "0.4.0",
+  "ojs-fiber": "0.4.0",
+  "ojs-gin": "0.4.0",
+  "ojs-gorm": "0.4.0",
+  "ojs-serverless": "0.4.0"
+}
