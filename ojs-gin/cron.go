@@ -3,6 +3,7 @@ package ojsgin
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	ojs "github.com/openjobspec/ojs-go-sdk"
 )
@@ -38,9 +39,17 @@ type CronConfig struct {
 //	    log.Fatal(err)
 //	}
 func RegisterCrons(ctx context.Context, client *ojs.Client, crons []CronConfig) error {
-	for _, c := range crons {
-		if c.Name == "" || c.Schedule == "" || c.JobType == "" {
-			return fmt.Errorf("ojsgin: cron config requires Name, Schedule, and JobType")
+	if ctx == nil {
+		return fmt.Errorf("ojsgin: context must not be nil")
+	}
+	for i, c := range crons {
+		if strings.TrimSpace(c.Name) == "" ||
+			strings.TrimSpace(c.Schedule) == "" ||
+			strings.TrimSpace(c.JobType) == "" {
+			return fmt.Errorf("ojsgin: cron %d requires Name, Schedule, and JobType", i)
+		}
+		if client == nil {
+			return fmt.Errorf("ojsgin: OJS client must not be nil")
 		}
 		req := ojs.CronJobRequest{
 			Name:     c.Name,

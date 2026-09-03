@@ -20,6 +20,14 @@ import (
 //	r.GET("/readyz",  wm.HealthHandler())                 // local worker health
 func HealthCheckHandler(client *ojs.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if client == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "unhealthy",
+				"error":  "OJS client is not configured",
+			})
+			return
+		}
+
 		status, err := client.Health(c.Request.Context())
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{

@@ -21,11 +21,19 @@ import (
 func HealthCheckHandler(client *ojs.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if client == nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"status": "unhealthy",
+				"error":  "OJS client is not configured",
+			})
+			return
+		}
 
 		status, err := client.Health(r.Context())
 		if err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"status": "unhealthy",
 				"error":  err.Error(),
 			})
@@ -34,11 +42,11 @@ func HealthCheckHandler(client *ojs.Client) http.HandlerFunc {
 
 		if status.Status != "healthy" {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(status)
+			_ = json.NewEncoder(w).Encode(status)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(status)
+		_ = json.NewEncoder(w).Encode(status)
 	}
 }
