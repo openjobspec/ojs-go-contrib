@@ -1,5 +1,6 @@
 # Build artifacts
 /bin/
+/.tools/
 *.exe
 *.exe~
 *.dll
@@ -9,6 +10,10 @@
 # Test artifacts
 coverage.out
 *.test
+
+# Pre-release dependency and proxy artifacts
+/.release-deps/
+/.release-proxy/
 
 # IDE
 .idea/
