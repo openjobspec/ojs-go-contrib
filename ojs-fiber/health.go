@@ -18,6 +18,13 @@ import (
 //	app.Get("/readyz",  wm.HealthHandler())                   // local worker health
 func HealthCheckHandler(client *ojs.Client) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		if client == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"status": "unhealthy",
+				"error":  "OJS client is not configured",
+			})
+		}
+
 		status, err := client.Health(c.UserContext())
 		if err != nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{

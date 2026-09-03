@@ -20,6 +20,13 @@ import (
 //	e.GET("/readyz",  wm.HealthHandler())                  // local worker health
 func HealthCheckHandler(client *ojs.Client) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		if client == nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{
+				"status": "unhealthy",
+				"error":  "OJS client is not configured",
+			})
+		}
+
 		status, err := client.Health(c.Request().Context())
 		if err != nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{

@@ -40,12 +40,13 @@ Each example should include:
 - `docker-compose.yml` with `ojs-backend-redis` and Redis for integration demos
 - `go.mod` with a `replace` directive pointing to the parent package
 - `main.go` — HTTP server that enqueues jobs
-- `worker.go` — Worker that processes jobs
+- `worker/main.go` — Separately buildable worker package that processes jobs
 - `README.md` — Prerequisites, setup, and run instructions
 
 ## Code Style
 
 - Follow standard Go conventions (`gofmt`, `go vet`).
+- Keep every module independently buildable with `GOWORK=off`.
 - Keep exported APIs small and focused.
 - Document all exported types and functions.
 
@@ -55,4 +56,3 @@ Each example should include:
 2. Ensure all tests pass: `make test-all`
 3. Ensure linting passes: `make lint`
 4. Submit a pull request with a clear description.
-

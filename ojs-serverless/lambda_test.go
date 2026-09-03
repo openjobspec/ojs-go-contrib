@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"sync"
 	"sync/atomic"
 	"testing"
 )
 
 func TestHandleAPIGateway_Success(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return nil
 	})
@@ -47,7 +46,7 @@ func TestHandleAPIGateway_Success(t *testing.T) {
 }
 
 func TestHandleAPIGateway_MethodNotAllowed(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	event := APIGatewayEvent{
 		HTTPMethod: "GET",
@@ -64,7 +63,7 @@ func TestHandleAPIGateway_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleAPIGateway_InvalidBody(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	event := APIGatewayEvent{
 		HTTPMethod: "POST",
@@ -85,7 +84,7 @@ func TestHandleAPIGateway_InvalidBody(t *testing.T) {
 }
 
 func TestHandleAPIGateway_HandlerError(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return errors.New("processing failed")
 	})
@@ -122,7 +121,7 @@ func TestHandleAPIGateway_HandlerError(t *testing.T) {
 }
 
 func TestHandleEventBridge_Success(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	var processedID string
 	h.Register("report.generate", func(ctx context.Context, job JobEvent) error {
@@ -148,7 +147,7 @@ func TestHandleEventBridge_Success(t *testing.T) {
 }
 
 func TestHandleEventBridge_InvalidDetail(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	event := EventBridgeEvent{
 		ID:         "eb-event-2",
@@ -164,7 +163,7 @@ func TestHandleEventBridge_InvalidDetail(t *testing.T) {
 }
 
 func TestHandleEventBridge_HandlerError(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("report.generate", func(ctx context.Context, job JobEvent) error {
 		return errors.New("report generation failed")
 	})
@@ -183,7 +182,7 @@ func TestHandleEventBridge_HandlerError(t *testing.T) {
 }
 
 func TestHandleRaw_DetectsSQS(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return nil
 	})
@@ -211,7 +210,7 @@ func TestHandleRaw_DetectsSQS(t *testing.T) {
 }
 
 func TestHandleRaw_DetectsAPIGateway(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return nil
 	})
@@ -238,7 +237,7 @@ func TestHandleRaw_DetectsAPIGateway(t *testing.T) {
 }
 
 func TestHandleRaw_DetectsEventBridge(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("report.generate", func(ctx context.Context, job JobEvent) error {
 		return nil
 	})
@@ -266,7 +265,7 @@ func TestHandleRaw_DetectsEventBridge(t *testing.T) {
 }
 
 func TestHandleRaw_DirectJobPayload(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return nil
 	})
@@ -289,7 +288,7 @@ func TestHandleRaw_DirectJobPayload(t *testing.T) {
 }
 
 func TestHandleRaw_UnknownPayload(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	payload := json.RawMessage(`{"unknown": "format"}`)
 
@@ -300,7 +299,7 @@ func TestHandleRaw_UnknownPayload(t *testing.T) {
 }
 
 func TestContextPropagation_APIGateway(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	var capturedTrigger TriggerType
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
@@ -327,7 +326,7 @@ func TestContextPropagation_APIGateway(t *testing.T) {
 }
 
 func TestContextPropagation_EventBridge(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	var capturedTrigger TriggerType
 	h.Register("report.generate", func(ctx context.Context, job JobEvent) error {
@@ -352,9 +351,6 @@ func TestContextPropagation_EventBridge(t *testing.T) {
 }
 
 func TestColdStartWarmup(t *testing.T) {
-	// Reset global state for this test.
-	coldStartOnce = syncOnceForTest()
-
 	var warmupCalled atomic.Int32
 	h := NewLambdaHandler(
 		WithColdStartWarmup(func() {
@@ -480,10 +476,3 @@ func TestLambdaContextFromContext_WithValues(t *testing.T) {
 		t.Errorf("expected DeadlineMs 1700000000000, got %d", lc.DeadlineMs)
 	}
 }
-
-// syncOnceForTest returns a fresh sync.Once for testing cold start behavior.
-func syncOnceForTest() syncOnce {
-	return syncOnce{}
-}
-
-type syncOnce = sync.Once

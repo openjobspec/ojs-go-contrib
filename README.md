@@ -24,7 +24,7 @@ Status definitions: `alpha` (API may change), `beta` (API stable, not battle-tes
 Install any integration package:
 
 ```bash
-go get github.com/openjobspec/ojs-go-contrib/ojs-gin
+go get github.com/openjobspec/ojs-go-contrib/ojs-gin@v0.5.0
 ```
 
 Each package includes an `examples/` directory with a complete working demo using Docker Compose.
@@ -32,6 +32,14 @@ Each package includes an `examples/` directory with a complete working demo usin
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on adding new contrib packages.
+
+All modules and nested examples are verified without the workspace:
+
+```bash
+make test-all
+make build-all
+make lint
+```
 
 ## License
 

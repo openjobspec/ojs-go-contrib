@@ -45,7 +45,7 @@ func ClientFromContext(ctx context.Context) (*ojs.Client, bool) {
 		return nil, false
 	}
 	client, ok := v.(*ojs.Client)
-	return client, ok
+	return client, ok && client != nil
 }
 
 // ClientFromRequest is a convenience wrapper that retrieves the OJS client
@@ -75,4 +75,3 @@ func MustClientFromContext(ctx context.Context) *ojs.Client {
 	}
 	return client
 }
-

@@ -15,10 +15,16 @@ A complete example using Chi router with OJS middleware and worker.
 docker-compose up -d
 ```
 
-2. Run the server (includes embedded worker):
+2. Run the server (includes an embedded worker):
 
 ```bash
-go run main.go worker.go
+go run .
+```
+
+To run the standalone worker example instead:
+
+```bash
+go run ./worker
 ```
 
 3. Enqueue a job:
@@ -32,12 +38,11 @@ curl -X POST http://localhost:3000/send-email \
 4. Check health:
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3000/readyz
 ```
 
 ## Architecture
 
 - `main.go` — Chi router with OJS middleware, job enqueue routes, and embedded worker
-- `worker.go` — Standalone worker example (shared process with server)
+- `worker/main.go` — Standalone worker example
 - `docker-compose.yml` — Redis + OJS backend server
-

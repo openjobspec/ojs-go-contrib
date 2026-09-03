@@ -6,31 +6,57 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.22', '1.23']
-        package:
-          - ojs-chi
-          - ojs-gin
-          - ojs-echo
-          - ojs-fiber
-          - ojs-gorm
-          - ojs-serverless
+    env:
+      GOPROXY: file://${{ github.workspace }}/.release-proxy/sdk,https://proxy.golang.org,direct
+      GONOSUMDB: github.com/openjobspec/ojs-go-sdk
+      OJS_GO_SDK_PRE_RELEASE_SHA: e83e1da6188441dc2d4f3621a7a72d2b32c2c133
+      FOUNDATION_READ_TOKEN: ${{ secrets.FOUNDATION_READ_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Require immutable pre-release dependency
+        run: |
+          if ! printf '%s' "$OJS_GO_SDK_PRE_RELEASE_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::Set OJS_GO_SDK_PRE_RELEASE_SHA to the immutable SDK 0.5.0 foundation commit"
+            exit 1
+          fi
+          if [ -z "$FOUNDATION_READ_TOKEN" ]; then
+            echo "::error::FOUNDATION_READ_TOKEN is required to check out pre-release foundation repositories"
+            exit 1
+          fi
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          repository: openjobspec/ojs-go-sdk
+          ref: ${{ env.OJS_GO_SDK_PRE_RELEASE_SHA }}
+          token: ${{ env.FOUNDATION_READ_TOKEN }}
+          path: .release-deps/ojs-go-sdk
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: '1.24.x'
+          cache-dependency-path: '**/go.sum'
 
-      - name: Vet
-        working-directory: ${{ matrix.package }}
-        run: go vet ./...
+      - name: Build clean pre-release SDK proxy
+        run: |
+          python3 .release-deps/ojs-go-sdk/scripts/build-local-proxy.py \
+            --module-root .release-deps/ojs-go-sdk .release-proxy/sdk v0.5.0
 
-      - name: Test
-        working-directory: ${{ matrix.package }}
-        run: go test ./... -race -cover
+      - name: Verify modules are tidy
+        run: make tidy-check
+
+      - name: Test standalone modules and examples
+        run: make test-all
+
+      - name: Build standalone modules and examples
+        run: make build-all
+
+      - name: Lint standalone modules and examples
+        run: make lint

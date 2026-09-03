@@ -30,7 +30,7 @@ func TestMiddleware_SetsClient(t *testing.T) {
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -53,7 +53,7 @@ func TestClientFromContext_Missing(t *testing.T) {
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -72,7 +72,7 @@ func TestEnqueue_NoClient(t *testing.T) {
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -95,7 +95,7 @@ func TestEnqueue_NoClient_ErrorMessage(t *testing.T) {
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -125,7 +125,7 @@ func TestMiddleware_MultipleRequests_SameClient(t *testing.T) {
 	})
 
 	for i := 0; i < 3; i++ {
-		req, _ := http.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		resp, err := app.Test(req)
 		if err != nil {
 			t.Fatalf("app.Test failed on request %d: %v", i, err)
@@ -175,7 +175,7 @@ func TestMiddleware_ConcurrentRequests(t *testing.T) {
 	for i := 0; i < n; i++ {
 		go func(idx int) {
 			defer wg.Done()
-			req, _ := http.NewRequest(http.MethodGet, "/", nil)
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			resp, err := app.Test(req)
 			if err != nil {
 				errs[idx] = err
@@ -216,7 +216,7 @@ func TestMiddleware_ErrorInHandler(t *testing.T) {
 		return fmt.Errorf("handler error")
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -243,7 +243,7 @@ func TestMiddleware_WrongLocalsKey(t *testing.T) {
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -273,7 +273,7 @@ func TestMustClientFromContext_Panics(t *testing.T) {
 		return nil
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -299,7 +299,7 @@ func TestMustClientFromContext_Success(t *testing.T) {
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -382,7 +382,7 @@ func TestWorkerHealthHandler_NoWorker(t *testing.T) {
 	app := fiber.New()
 	app.Get("/health", wm.HealthHandler())
 
-	req, _ := http.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -416,7 +416,7 @@ func TestHealthCheckHandler_Healthy(t *testing.T) {
 	app := fiber.New()
 	app.Get("/healthz", HealthCheckHandler(client))
 
-	req, _ := http.NewRequest(http.MethodGet, "/healthz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
@@ -437,8 +437,8 @@ func TestHealthCheckHandler_Unreachable(t *testing.T) {
 	app := fiber.New()
 	app.Get("/healthz", HealthCheckHandler(client))
 
-	req, _ := http.NewRequest(http.MethodGet, "/healthz", nil)
-	resp, err := app.Test(req)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	resp, err := app.Test(req, 5000)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)
 	}
@@ -467,7 +467,7 @@ func TestHealthCheckHandler_Unhealthy(t *testing.T) {
 	app := fiber.New()
 	app.Get("/healthz", HealthCheckHandler(client))
 
-	req, _ := http.NewRequest(http.MethodGet, "/healthz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("app.Test failed: %v", err)

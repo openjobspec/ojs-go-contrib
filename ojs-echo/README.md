@@ -5,7 +5,7 @@ Echo web framework middleware for [Open Job Spec](https://github.com/openjobspec
 ## Installation
 
 ```bash
-go get github.com/openjobspec/ojs-go-contrib/ojs-echo
+go get github.com/openjobspec/ojs-go-contrib/ojs-echo@v0.5.0
 ```
 
 ## Usage
@@ -51,7 +51,10 @@ Helper that retrieves the OJS client from the Echo context and enqueues a job.
 
 Retrieves the OJS client stored in the Echo context by the middleware.
 
+### Worker lifecycle
+
+`NewWorkerManager` applies queue, concurrency, poll interval, and shutdown grace settings. Use `NewWorkerManagerWithSDKOptions` for SDK options such as `ojs.WithWorkerAuth`, and observe `StartAsync` completion through `Wait` or `Err`. `HealthHandler` reports ready only while the worker is running.
+
 ## Example
 
 See [examples/](./examples/) for a complete working demo with Docker Compose.
-

@@ -16,42 +16,54 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"log"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	ojs "github.com/openjobspec/ojs-go-sdk"
 	ojsfiber "github.com/openjobspec/ojs-go-contrib/ojs-fiber"
+	ojs "github.com/openjobspec/ojs-go-sdk"
 )
 
 func main() {
-	client, err := ojs.NewClient("http://localhost:8080")
+	ojsURL := envOrDefault("OJS_URL", "http://localhost:8080")
+	var clientOptions []ojs.ClientOption
+	var workerOptions []ojs.WorkerOption
+	if token := os.Getenv("OJS_AUTH_TOKEN"); token != "" {
+		clientOptions = append(clientOptions, ojs.WithAuthToken(token))
+		workerOptions = append(workerOptions, ojs.WithWorkerAuth(token))
+	}
+	client, err := ojs.NewClient(ojsURL, clientOptions...)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Set up Fiber
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit:    1 << 20,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  time.Minute,
+	})
 	app.Use(logger.New())
 	app.Use(recover.New())
 	app.Use(ojsfiber.Middleware(client))
 
 	// Set up worker
-	worker := ojsfiber.NewWorkerManager(ojsfiber.WorkerOptions{
-		URL:         "http://localhost:8080",
+	worker := ojsfiber.NewWorkerManagerWithSDKOptions(ojsfiber.WorkerOptions{
+		URL:         ojsURL,
 		Queues:      []string{"default", "emails"},
 		Concurrency: 10,
-	})
+	}, workerOptions...)
 
 	worker.Register("email.send", handleEmailSend)
 
 	// Routes
-	app.Post("/send-email", sendEmailHandler)
-	app.Get("/jobs/:id", getJobHandler)
-	app.Get("/healthz", ojsfiber.HealthCheckHandler(client)) // OJS server health
-	app.Get("/readyz", worker.HealthHandler())                // local worker health
+	registerRoutes(app, client, worker)
 
 	// Register cron jobs
 	crons := []ojsfiber.CronConfig{
@@ -72,20 +84,38 @@ func main() {
 	}
 
 	if err := worker.StartAsync(ctx); err != nil {
-		log.Fatal(err)
+		log.Printf("start worker: %v", err)
+		return
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		log.Println("Server listening on :3000")
-		if err := app.Listen(":3000"); err != nil {
-			log.Fatal(err)
-		}
+		serverErr <- app.Listen(":3000")
 	}()
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case err := <-serverErr:
+		if err != nil {
+			log.Printf("server stopped: %v", err)
+		}
+		cancel()
+	}
 	log.Println("Shutting down...")
-	app.Shutdown()
-	worker.Stop()
+	if err := app.ShutdownWithTimeout(10 * time.Second); err != nil {
+		log.Printf("server shutdown: %v", err)
+	}
+	if err := worker.Stop(); err != nil {
+		log.Printf("worker shutdown: %v", err)
+	}
+}
+
+func registerRoutes(app *fiber.App, client *ojs.Client, worker *ojsfiber.WorkerManager) {
+	app.Post("/send-email", sendEmailHandler)
+	app.Get("/jobs/:id", getJobHandler)
+	app.Get("/healthz", ojsfiber.HealthCheckHandler(client))
+	app.Get("/readyz", worker.HealthHandler())
 }
 
 func sendEmailHandler(c *fiber.Ctx) error {
@@ -94,7 +124,12 @@ func sendEmailHandler(c *fiber.Ctx) error {
 		Subject string `json:"subject"`
 	}
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if strings.TrimSpace(body.To) == "" || strings.TrimSpace(body.Subject) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "to and subject are required",
+		})
 	}
 
 	err := ojsfiber.Enqueue(c, "email.send", ojs.Args{
@@ -102,19 +137,27 @@ func sendEmailHandler(c *fiber.Ctx) error {
 		"subject": body.Subject,
 	})
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		log.Printf("enqueue email.send: %v", err)
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "failed to enqueue job"})
 	}
 
-	return c.JSON(fiber.Map{"status": "enqueued"})
+	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{"status": "enqueued"})
 }
 
 func getJobHandler(c *fiber.Ctx) error {
 	client := ojsfiber.MustClientFromContext(c)
 
-	jobID := c.Params("id")
+	jobID := strings.TrimSpace(c.Params("id"))
+	if jobID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "job id is required"})
+	}
 	job, err := client.GetJob(c.UserContext(), jobID)
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		status := fiber.StatusBadGateway
+		if errors.Is(err, ojs.ErrNotFound) {
+			status = fiber.StatusNotFound
+		}
+		return c.Status(status).JSON(fiber.Map{"error": "failed to retrieve job"})
 	}
 
 	return c.JSON(job)
@@ -123,7 +166,13 @@ func getJobHandler(c *fiber.Ctx) error {
 func handleEmailSend(ctx context.Context, job *ojs.JobContext) error {
 	to, _ := job.Job.Args["to"].(string)
 	subject, _ := job.Job.Args["subject"].(string)
-	data, _ := json.Marshal(map[string]string{"to": to, "subject": subject})
-	log.Printf("Sending email: %s", data)
+	log.Printf("Sending email: to=%q subject=%q", to, subject)
 	return nil
+}
+
+func envOrDefault(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
 }

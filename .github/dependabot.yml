@@ -1,7 +1,18 @@
 version: 2
 updates:
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/ojs-chi"
+      - "/ojs-chi/examples"
+      - "/ojs-echo"
+      - "/ojs-echo/examples"
+      - "/ojs-fiber"
+      - "/ojs-fiber/examples"
+      - "/ojs-gin"
+      - "/ojs-gin/examples"
+      - "/ojs-gorm"
+      - "/ojs-gorm/examples"
+      - "/ojs-serverless"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

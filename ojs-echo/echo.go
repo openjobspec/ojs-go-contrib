@@ -34,7 +34,7 @@ func ClientFromContext(c echo.Context) (*ojs.Client, bool) {
 		return nil, false
 	}
 	client, ok := v.(*ojs.Client)
-	return client, ok
+	return client, ok && client != nil
 }
 
 // Enqueue retrieves the OJS client from the Echo context and enqueues a job.

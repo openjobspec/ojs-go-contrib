@@ -7,7 +7,7 @@ Chi is the HTTP router used by the official OJS backends (`ojs-backend-redis`, `
 ## Installation
 
 ```bash
-go get github.com/openjobspec/ojs-go-contrib/ojs-chi
+go get github.com/openjobspec/ojs-go-contrib/ojs-chi@v0.5.0
 ```
 
 ## Usage
@@ -90,26 +90,32 @@ func main() {
     })
 
     worker.Register("email.send", func(ctx context.Context, job *ojs.JobContext) error {
-        to := job.Args["to"].(string)
+        to := job.Job.Args["to"].(string)
         fmt.Printf("Sending email to %s\n", to)
         return nil
     })
 
     // Health check endpoint
-    r.Get("/health", worker.HealthHandler())
+    r.Get("/readyz", worker.HealthHandler())
 
     // Start worker and server with graceful shutdown
     ctx, cancel := ojschi.GracefulShutdown()
     defer cancel()
 
-    worker.StartAsync(ctx)
+    if err := worker.StartAsync(ctx); err != nil {
+        log.Fatal(err)
+    }
 
     srv := &http.Server{Addr: ":3000", Handler: r}
     go srv.ListenAndServe()
 
     <-ctx.Done()
-    srv.Shutdown(context.Background())
-    worker.Stop()
+    if err := srv.Shutdown(context.Background()); err != nil {
+        log.Printf("server shutdown: %v", err)
+    }
+    if err := worker.Stop(); err != nil {
+        log.Printf("worker shutdown: %v", err)
+    }
 }
 ```
 
@@ -139,9 +145,17 @@ Helper that retrieves the OJS client from the request context and enqueues a job
 
 Creates a new worker manager for running an OJS worker alongside your Chi server.
 
+### `NewWorkerManagerWithSDKOptions(opts WorkerOptions, sdkOpts ...ojs.WorkerOption) *WorkerManager`
+
+Adds SDK-level worker options such as `ojs.WithWorkerAuth` or a custom HTTP client without changing the stable `WorkerOptions` struct.
+
+### `(*WorkerManager) Wait() error` and `Err() error`
+
+Observe terminal errors from `StartAsync`. `Stop` cancels the owned worker context and waits up to `ShutdownTimeout`.
+
 ### `GracefulShutdown() (context.Context, context.CancelFunc)`
 
-Sets up signal handling for graceful shutdown of both the Chi server and OJS worker. Returns a context that is cancelled on SIGTERM or SIGINT.
+Uses `signal.NotifyContext` for SIGTERM/SIGINT. Always call the returned cancel function to release signal resources.
 
 ## Example
 

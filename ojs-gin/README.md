@@ -5,7 +5,7 @@ Gin web framework middleware for [Open Job Spec](https://github.com/openjobspec/
 ## Installation
 
 ```bash
-go get github.com/openjobspec/ojs-go-contrib/ojs-gin
+go get github.com/openjobspec/ojs-go-contrib/ojs-gin@v0.5.0
 ```
 
 ## Usage
@@ -51,6 +51,10 @@ Helper that retrieves the OJS client from the Gin context and enqueues a job.
 ### `ClientFromContext(c *gin.Context) (*ojs.Client, bool)`
 
 Retrieves the OJS client stored in the Gin context by the middleware.
+
+### Worker lifecycle
+
+`NewWorkerManager` applies queue, concurrency, poll interval, and shutdown grace settings. Use `NewWorkerManagerWithSDKOptions` for SDK options such as `ojs.WithWorkerAuth`, and observe `StartAsync` completion through `Wait` or `Err`. `HealthHandler` reports ready only while the worker is running.
 
 ## Example
 
