@@ -10,7 +10,7 @@ import (
 )
 
 func TestHandleSQS_Success(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	var processedIDs []string
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
@@ -46,7 +46,7 @@ func TestHandleSQS_Success(t *testing.T) {
 }
 
 func TestHandleSQS_PartialFailure(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return nil
@@ -81,7 +81,7 @@ func TestHandleSQS_PartialFailure(t *testing.T) {
 }
 
 func TestHandleSQS_InvalidJSON(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	event := SQSEvent{
 		Records: []SQSMessage{
@@ -103,7 +103,7 @@ func TestHandleSQS_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleHTTP_Success(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	h.Register("email.send", func(ctx context.Context, job JobEvent) error {
 		return nil
 	})
@@ -130,7 +130,7 @@ func TestHandleHTTP_Success(t *testing.T) {
 }
 
 func TestHandleHTTP_HandlerError(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 	// No handler registered
 
 	body := `{"job":{"id":"job-1","type":"unknown.type","queue":"default","args":[],"attempt":1},"worker_id":"w1","delivery_id":"d1"}`
@@ -163,7 +163,7 @@ func TestHandleHTTP_HandlerError(t *testing.T) {
 }
 
 func TestHandleHTTP_MethodNotAllowed(t *testing.T) {
-	h := NewLambdaHandler()
+	h := newInsecureHandler()
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()

@@ -10,6 +10,7 @@
 //
 //	handler := serverless.NewLambdaHandler(
 //	    serverless.WithOJSURL("https://ojs.example.com"),
+//	    serverless.WithPushSigningSecrets(os.Getenv("OJS_PUSH_SIGNING_SECRET")),
 //	)
 //
 //	handler.Register("email.send", func(ctx context.Context, job serverless.JobEvent) error {
@@ -21,6 +22,7 @@
 //
 // # Push Delivery
 //
-// For HTTP push delivery (OJS server pushes jobs to a function URL),
-// use HandleHTTP which accepts standard http.Handler compatible signatures.
+// For HTTP push delivery (OJS server pushes jobs to a function URL), use
+// HandleHTTP. Push entry points fail closed unless signing secrets are
+// configured. The signature covers X-OJS-Timestamp + "." + the exact raw body.
 package serverless

@@ -5,8 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
+	"time"
+)
+
+const (
+	// DefaultTimeout is the maximum duration for processing a job.
+	DefaultTimeout = 30 * time.Second
+	// DefaultMaxBodySize is the maximum decoded HTTP push body size.
+	DefaultMaxBodySize int64 = 1 << 20
+	// DefaultPushFreshnessWindow is the maximum accepted push timestamp skew.
+	DefaultPushFreshnessWindow = 5 * time.Minute
 )
 
 // JobEvent represents an OJS job delivered to a serverless function.
@@ -23,57 +32,44 @@ type JobEvent struct {
 // HandlerFunc is a function that processes an OJS job in a serverless context.
 type HandlerFunc func(ctx context.Context, job JobEvent) error
 
-// SQSEvent represents an AWS SQS event containing one or more messages.
-type SQSEvent struct {
-	Records []SQSMessage `json:"Records"`
-}
-
-// SQSMessage represents a single SQS message containing an OJS job.
-type SQSMessage struct {
-	MessageID     string            `json:"messageId"`
-	Body          string            `json:"body"`
-	Attributes    map[string]string `json:"attributes,omitempty"`
-	MD5OfBody     string            `json:"md5OfBody,omitempty"`
-	EventSourceID string            `json:"eventSource,omitempty"`
-	ReceiptHandle string            `json:"receiptHandle,omitempty"`
-}
-
-// SQSBatchResponse is the response format for SQS batch item failures.
-// Returning failed message IDs tells SQS to retry only those messages.
-type SQSBatchResponse struct {
-	BatchItemFailures []BatchItemFailure `json:"batchItemFailures"`
-}
-
-// BatchItemFailure identifies a single failed message in an SQS batch.
-type BatchItemFailure struct {
-	ItemIdentifier string `json:"itemIdentifier"`
-}
-
-// PushDeliveryRequest is the HTTP body sent by an OJS server for push delivery.
-type PushDeliveryRequest struct {
-	Job        JobEvent `json:"job"`
-	WorkerID   string   `json:"worker_id"`
-	DeliveryID string   `json:"delivery_id"`
-}
-
-// PushDeliveryResponse is the HTTP response body for push delivery.
-type PushDeliveryResponse struct {
-	Status string          `json:"status"`
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  *PushError      `json:"error,omitempty"`
-}
-
-// PushError describes a job processing failure.
-type PushError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	Retryable bool   `json:"retryable"`
-}
-
 // Option configures the LambdaHandler.
 type Option func(*LambdaHandler)
 
-// WithOJSURL sets the OJS server URL for callback operations.
+// HandlerOptions contains shared execution and HTTP push settings.
+type HandlerOptions struct {
+	Timeout                                      time.Duration
+	MaxBodySize                                  int64
+	SQSConcurrency                               int
+	PushSigningSecrets                           []string
+	PushFreshnessWindow                          time.Duration
+	InsecureAllowUnsignedPushForLocalDevelopment bool
+}
+
+// WithHandlerOptions applies shared serverless handler settings.
+func WithHandlerOptions(options HandlerOptions) Option {
+	return func(h *LambdaHandler) {
+		if options.Timeout != 0 {
+			h.timeout = options.Timeout
+		}
+		if options.MaxBodySize != 0 {
+			h.maxBodySize = options.MaxBodySize
+		}
+		if options.SQSConcurrency != 0 {
+			h.sqsConcurrency = options.SQSConcurrency
+		}
+		if len(options.PushSigningSecrets) > 0 {
+			h.setPushSigningSecrets(options.PushSigningSecrets)
+		}
+		if options.PushFreshnessWindow != 0 {
+			h.pushFreshnessWindow = options.PushFreshnessWindow
+		}
+		if options.InsecureAllowUnsignedPushForLocalDevelopment {
+			h.insecureAllowUnsignedPushForLocalDevelopment = true
+		}
+	}
+}
+
+// WithOJSURL sets the OJS server URL reserved for callback operations.
 func WithOJSURL(url string) Option {
 	return func(h *LambdaHandler) {
 		h.ojsURL = url
@@ -87,27 +83,124 @@ func WithLogger(logger *slog.Logger) Option {
 	}
 }
 
-// LambdaHandler processes OJS jobs delivered via SQS, HTTP push,
-// API Gateway, or EventBridge events.
+// WithTimeout sets the maximum job processing duration. Zero disables it.
+func WithTimeout(timeout time.Duration) Option {
+	return func(h *LambdaHandler) {
+		h.timeout = timeout
+	}
+}
+
+// WithMaxBodySize sets the maximum decoded HTTP push body size.
+func WithMaxBodySize(size int64) Option {
+	return func(h *LambdaHandler) {
+		h.maxBodySize = size
+	}
+}
+
+// WithSQSConcurrency sets the maximum records processed concurrently. The
+// default is one, preserving SQS event order.
+func WithSQSConcurrency(concurrency int) Option {
+	return func(h *LambdaHandler) {
+		h.sqsConcurrency = concurrency
+	}
+}
+
+// WithPushSigningSecrets replaces the secrets accepted for OJS push
+// signatures. Multiple values support rotation without downtime.
+func WithPushSigningSecrets(secrets ...string) Option {
+	return func(h *LambdaHandler) {
+		h.setPushSigningSecrets(secrets)
+	}
+}
+
+// WithPushFreshnessWindow sets the permitted past or future timestamp skew.
+func WithPushFreshnessWindow(window time.Duration) Option {
+	return func(h *LambdaHandler) {
+		h.pushFreshnessWindow = window
+	}
+}
+
+// WithInsecureAllowUnsignedPushForLocalDevelopment disables HTTP push
+// authentication. It must only be used for local development and tests.
+func WithInsecureAllowUnsignedPushForLocalDevelopment() Option {
+	return func(h *LambdaHandler) {
+		h.insecureAllowUnsignedPushForLocalDevelopment = true
+	}
+}
+
+// WithColdStartWarmup configures a warmup function that runs once per handler.
+func WithColdStartWarmup(fn func()) Option {
+	return func(h *LambdaHandler) {
+		h.warmupFn = fn
+	}
+}
+
+// WithDefaultHandler sets a fallback handler for unregistered job types.
+func WithDefaultHandler(handler HandlerFunc) Option {
+	return func(h *LambdaHandler) {
+		h.defaultHandler = handler
+	}
+}
+
+// LambdaHandler processes OJS jobs delivered via SQS, HTTP push, API Gateway,
+// EventBridge, or direct Lambda invocation.
 type LambdaHandler struct {
 	handlers       map[string]HandlerFunc
 	defaultHandler HandlerFunc
 	mu             sync.RWMutex
+
 	ojsURL         string
 	logger         *slog.Logger
-	warmupFn       func()
+	timeout        time.Duration
+	maxBodySize    int64
+	sqsConcurrency int
+	initialized    time.Time
+
+	pushSigningSecrets                           [][]byte
+	pushFreshnessWindow                          time.Duration
+	insecureAllowUnsignedPushForLocalDevelopment bool
+
+	warmupFn   func()
+	warmupOnce sync.Once
+	warmupErr  error
 }
 
 // NewLambdaHandler creates a new serverless handler with the given options.
 func NewLambdaHandler(opts ...Option) *LambdaHandler {
 	h := &LambdaHandler{
-		handlers: make(map[string]HandlerFunc),
-		logger:   slog.Default(),
+		handlers:            make(map[string]HandlerFunc),
+		logger:              slog.Default(),
+		timeout:             DefaultTimeout,
+		maxBodySize:         DefaultMaxBodySize,
+		sqsConcurrency:      1,
+		initialized:         time.Now(),
+		pushFreshnessWindow: DefaultPushFreshnessWindow,
 	}
 	for _, opt := range opts {
-		opt(h)
+		if opt != nil {
+			opt(h)
+		}
+	}
+	if h.logger == nil {
+		h.logger = slog.Default()
+	}
+	if h.maxBodySize <= 0 {
+		h.maxBodySize = DefaultMaxBodySize
+	}
+	if h.sqsConcurrency <= 0 {
+		h.sqsConcurrency = 1
 	}
 	return h
+}
+
+func (h *LambdaHandler) setPushSigningSecrets(secrets []string) {
+	copied := make([][]byte, 0, len(secrets))
+	for _, secret := range secrets {
+		if secret != "" {
+			copied = append(copied, []byte(secret))
+		}
+	}
+	h.pushSigningSecrets = copied
 }
 
 // Register associates a handler function with a job type.
@@ -117,102 +210,66 @@ func (h *LambdaHandler) Register(jobType string, handler HandlerFunc) {
 	h.handlers[jobType] = handler
 }
 
-// HandleSQS processes an SQS event containing OJS jobs.
-// It returns partial batch failures so SQS only retries failed messages.
-func (h *LambdaHandler) HandleSQS(ctx context.Context, event SQSEvent) (SQSBatchResponse, error) {
-	var failures []BatchItemFailure
-
-	for _, record := range event.Records {
-		var job JobEvent
-		if err := json.Unmarshal([]byte(record.Body), &job); err != nil {
-			h.logger.Error("failed to unmarshal SQS message",
-				"message_id", record.MessageID,
-				"error", err,
-			)
-			failures = append(failures, BatchItemFailure{
-				ItemIdentifier: record.MessageID,
-			})
-			continue
-		}
-
-		if err := h.processJob(ctx, job); err != nil {
-			h.logger.Error("job processing failed",
-				"job_id", job.ID,
-				"job_type", job.Type,
-				"error", err,
-			)
-			failures = append(failures, BatchItemFailure{
-				ItemIdentifier: record.MessageID,
-			})
-			continue
-		}
-
-		h.logger.Info("job completed",
-			"job_id", job.ID,
-			"job_type", job.Type,
-		)
-	}
-
-	return SQSBatchResponse{BatchItemFailures: failures}, nil
+// Initialized returns when this reusable handler instance was created.
+func (h *LambdaHandler) Initialized() time.Time {
+	return h.initialized
 }
 
-// HandleHTTP returns an http.HandlerFunc for OJS push delivery.
-// The OJS server POSTs job payloads to this endpoint.
-func (h *LambdaHandler) HandleHTTP() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var req PushDeliveryRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, PushDeliveryResponse{
-				Status: "failed",
-				Error: &PushError{
-					Code:      "invalid_request",
-					Message:   "failed to decode request body",
-					Retryable: false,
-				},
-			})
-			return
-		}
-
-		if err := h.processJob(r.Context(), req.Job); err != nil {
-			writeJSON(w, http.StatusOK, PushDeliveryResponse{
-				Status: "failed",
-				Error: &PushError{
-					Code:      "handler_error",
-					Message:   err.Error(),
-					Retryable: true,
-				},
-			})
-			return
-		}
-
-		writeJSON(w, http.StatusOK, PushDeliveryResponse{
-			Status: "completed",
-		})
-	}
+// OJSURL returns the configured OJS callback server URL.
+func (h *LambdaHandler) OJSURL() string {
+	return h.ojsURL
 }
 
 func (h *LambdaHandler) processJob(ctx context.Context, job JobEvent) error {
+	if job.ID == "" || job.Type == "" {
+		return fmt.Errorf("job id and type are required")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	h.mu.RLock()
 	handler, ok := h.handlers[job.Type]
-	h.mu.RUnlock()
-
 	if !ok {
-		if h.defaultHandler != nil {
-			return h.defaultHandler(ctx, job)
-		}
+		handler = h.defaultHandler
+	}
+	h.mu.RUnlock()
+	if handler == nil {
 		return fmt.Errorf("no handler registered for job type: %s", job.Type)
 	}
 
+	if h.timeout > 0 {
+		timedCtx, cancel := context.WithTimeout(ctx, h.timeout)
+		defer cancel()
+		ctx = timedCtx
+	}
+	return invokeHandler(ctx, handler, job)
+}
+
+func invokeHandler(ctx context.Context, handler HandlerFunc, job JobEvent) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("panic in job handler for %s: %v", job.Type, recovered)
+		}
+	}()
 	return handler(ctx, job)
 }
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+func (h *LambdaHandler) runWarmup() error {
+	h.warmupOnce.Do(func() {
+		if h.warmupFn == nil {
+			return
+		}
+		started := time.Now()
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				h.warmupErr = fmt.Errorf("cold start warmup panic: %v", recovered)
+			}
+		}()
+		h.warmupFn()
+		h.logger.Info("cold start warmup completed",
+			"duration_ms", time.Since(started).Milliseconds(),
+		)
+	})
+	return h.warmupErr
 }
